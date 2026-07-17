@@ -1,3 +1,5 @@
+//its configuration to test code with postman otherwise it returns error
+
 package com.example.chat_app.auth.security;
 
 import org.springframework.context.annotation.Bean;
