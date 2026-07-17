@@ -3,6 +3,8 @@ package com.example.chat_app.auth.service;
 import com.example.chat_app.auth.dto.RegisterRequest;
 import com.example.chat_app.auth.entity.User;
 import com.example.chat_app.auth.repository.UserRepository;
+import com.example.chat_app.common.exception.EmailAlreadyExistsException;
+import com.example.chat_app.common.exception.UsernameAlreadyExistsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -21,10 +23,10 @@ public class AuthService {
     public void register(RegisterRequest request) {
        // Check if Username Already Exists
         if (userRepository.existsByUsername(request.getUsername())) {
-            throw new RuntimeException("Username already exists");
+            throw new UsernameAlreadyExistsException();
         }
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Email already exists");
+            throw new EmailAlreadyExistsException();
         }
         User user = User.builder()
                 .username(request.getUsername())
