@@ -1,5 +1,6 @@
 package com.example.chat_app.auth.controller;
 
+import com.example.chat_app.auth.dto.RegisterResponse;
 import jakarta.validation.Valid;
 import com.example.chat_app.auth.dto.RegisterRequest;
 import com.example.chat_app.auth.service.AuthService;
@@ -18,11 +19,10 @@ public class AuthController {
 
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
-    public String register(@Valid @RequestBody RegisterRequest request) {
+    public RegisterResponse register(@Valid @RequestBody RegisterRequest request) {
 
-        authService.register(request);
+        return authService.register(request);
 
-        return "User registered successfully";
 
     }
 

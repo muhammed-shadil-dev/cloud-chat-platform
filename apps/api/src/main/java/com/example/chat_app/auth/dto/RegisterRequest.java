@@ -1,5 +1,5 @@
 package com.example.chat_app.auth.dto;
-//Represents the HTTP request from the client.
+//Represents the HTTP request from the client,hanbdles https
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;

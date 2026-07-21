@@ -1,6 +1,7 @@
 package com.example.chat_app.auth.service;
 
 import com.example.chat_app.auth.dto.RegisterRequest;
+import com.example.chat_app.auth.dto.RegisterResponse;
 import com.example.chat_app.auth.entity.User;
 import com.example.chat_app.auth.repository.UserRepository;
 import com.example.chat_app.common.exception.EmailAlreadyExistsException;
@@ -20,7 +21,8 @@ public class AuthService {
         System.out.println("AuthService Created Successfully!");
 
     }
-    public void register(RegisterRequest request) {
+    //it return registerRsponse
+    public RegisterResponse register(RegisterRequest request) {
        // Check if Username Already Exists
         if (userRepository.existsByUsername(request.getUsername())) {
             throw new UsernameAlreadyExistsException();
@@ -33,6 +35,13 @@ public class AuthService {
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .build();
-        userRepository.save(user);
+        User savedUser = userRepository.save(user);
+
+        return RegisterResponse.builder()
+                .id(savedUser.getId())
+                .username(savedUser.getUsername())
+                .email(savedUser.getEmail())
+                .message("User registered successfully")
+                .build();
     }
 }
