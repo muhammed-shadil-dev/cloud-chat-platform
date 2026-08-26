@@ -24,11 +24,11 @@ line of work is therefore the backend authentication sequence, not the remaining
 scaffolding:
 
 ```
-P1-5  Registration WebMvcTest coverage      ← next
+P1-5  Registration WebMvcTest coverage      ✅ done 2026-08-26
   ↓
-P1-6  Database-backed authentication
+P1-6  Database-backed authentication        ← next
   ↓
-P1-7  Login endpoint and JWT issuance
+P1-7  Login endpoint and JWT issuance       (needs 3 decisions first — see task)
 ```
 
 This is a **deliberate deviation** from strict top-to-bottom phase order: **P0-8** (Next.js
@@ -306,7 +306,7 @@ complete** and `/next` proceeds into Phase 1.
   why the response carries a token type.
 - **Status:** 🚧 DTOs exist; no producer or consumer. Completed by P1-7.
 
-#### ☐ P1-5 · Registration API-layer tests — *auth*
+#### ✅ P1-5 · Registration API-layer tests — *auth*
 - **Goal:** Close out registration by testing the HTTP contract, not just the service.
 - **Depends on:** P1-3
 - **Scope:** `@WebMvcTest(AuthController)` with mocked `AuthService` and Spring Security test
@@ -316,8 +316,8 @@ complete** and `/next` proceeds into Phase 1.
 - **Docs:** Update the registration note's §10 Testing with real results.
 - **Interview concepts:** Slice tests vs full context tests; why `@WebMvcTest` needs security
   configuration considered; testing validation at the boundary that enforces it.
-- **Status:** ☐ Not started. **← ACTIVE — next task for `/next`.** Small; closes out registration
-  before the auth sequence continues.
+- **Status:** ✅ Completed 2026-08-26 — 10 tests, all passing. Registration's HTTP contract is now
+  covered; the feature is closed out.
 
 #### ☐ P1-6 · Database-backed authentication — *auth*
 - **Goal:** Make persisted users actually able to authenticate. Today `CustomUserDetails` exists but
@@ -383,6 +383,41 @@ complete** and `/next` proceeds into Phase 1.
 
 *(Entries added as tasks complete. P1-1 … P1-3 were implemented by the developer before this
 workflow existed; verified against the code and the passing test run on 2026-08-26.)*
+
+**P1-5 (2026-08-26)** — `AuthControllerTest`, 10 tests, all passing. Test-only change: no
+production code, dependency, schema, or API behavior was touched. Full suite now
+`Tests run: 20, Failures: 0, Errors: 0, Skipped: 0` — `BUILD SUCCESS`.
+
+Covers what only the web layer can prove: `201` with the response DTO, `400` with a field→message
+map for blank username / malformed email / short password, `409` for both conflict exceptions, and
+`409` for `DataIntegrityViolationException` (the race the `existsBy` checks cannot close). Plus two
+assertions that are really guardrails: the response never carries a `password`/`passwordHash` field
+(fails immediately if someone ever returns the entity instead of the DTO), and validation rejects a
+bad request **without the service being called at all**.
+
+Decisions:
+- **Imported `SecurityConfig` into the slice.** `@WebMvcTest` does not pick up plain
+  `@Configuration` classes, so without it Spring Security's defaults apply and everything 401s —
+  the tests would then pass or fail for reasons unrelated to the real rules. With it imported,
+  these unauthenticated requests succeeding *is* the assertion that `/api/auth/**` is public.
+- **Asserted fields, not wording, where the message is not deterministic.** A blank username
+  violates both `@NotBlank` and `@Size(min = 3)`, and `GlobalExceptionHandler` keeps one message
+  per field, so which survives is arbitrary. Same for `@Size` on password, whose default message is
+  locale-dependent. Only the custom `"Invalid email format"` message is asserted verbatim.
+- **Raw JSON string bodies** rather than serializing the DTO, so the test exercises the real
+  deserialization path a client would hit.
+
+Two findings recorded, not fixed (out of P1-5's scope):
+1. **`GlobalExceptionHandler` collapses multiple errors per field.** `errors.put(field, message)`
+   keeps only the last violation for a field, and the validation response shape
+   (`{field: message}`) differs from `ErrorResponse` (`{status, message}`) used everywhere else —
+   two different error contracts on one endpoint.
+2. **No handler for `HttpMessageNotReadableException`.** Malformed JSON falls through to Spring's
+   default error body, a third shape. Worth a small task to unify the three.
+
+Also confirmed while writing the verification guide: **no class in `auth`, `users`, or `common`
+declares a logger**, so this feature emits no application log lines of its own. The note says so
+rather than inventing log output.
 
 ---
 
