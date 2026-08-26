@@ -31,11 +31,10 @@ Established by direct inspection, not assumption:
 - **`apps/web` is not initialized.** `package.json`, `next.config.ts`, and `tsconfig.json` are
   0-byte files; the feature directories are empty; there is no `node_modules`.
 - **`docker/`, `deployment/`, `monitoring/`, `scripts/` are empty.** No Docker CLI on this machine.
-- **Uncommitted work is in the tree.** A refactor moving `User` and `UserRepository` from
-  `auth/` to a new `users/` module, plus new tests, `.env.example`, `application-dev.properties`,
-  and the two `AGENTS.md` files, are staged-but-uncommitted / untracked. This is the developer's
-  work — it is real and it compiles, so the tasks it completes are marked ✅ below, but a `/next`
-  run must **not** sweep it into an unrelated commit. See P0-6.
+- ~~**Uncommitted work is in the tree.**~~ Resolved 2026-08-26: the `auth` → `users` module
+  extraction, its tests, `.env.example`, `application-dev.properties`, and the two `AGENTS.md`
+  files were committed as `65e73fd` and pushed. Local `main` and `origin/main` are in sync. See
+  P0-6.
 - **Known risk:** `application.properties` sets `spring.profiles.default=dev`, so a deployment that
   forgets to set a profile silently runs with `ddl-auto=update`. Tracked as P12-1.
 
@@ -98,7 +97,7 @@ Established by direct inspection, not assumption:
   not a follow-up.
 - **Status:** ✅ Completed 2026-08-26.
 
-#### ☐ P0-6 · Commit the pending `users` module refactor — *api*
+#### ✅ P0-6 · Commit the pending `users` module refactor — *api*
 - **Goal:** Get the developer's uncommitted `auth` → `users` module extraction into history so the
   board and the repository agree.
 - **Depends on:** P0-5
@@ -110,9 +109,9 @@ Established by direct inspection, not assumption:
 - **Docs:** Note the module-boundary rationale in the Phase 0 Obsidian note.
 - **Interview concepts:** Module extraction; why `auth` calling `users`' *service* (not its
   repository) is the boundary that matters; keeping commits reviewable.
-- **Status:** ☐ Not started — needs the developer's go-ahead.
+- **Status:** ✅ Completed 2026-08-26 — commit `65e73fd`, pushed to `origin/main`.
 
-#### ☐ P0-7 · Actuator health check — *api*
+#### ✅ P0-7 · Actuator health check — *api*
 - **Goal:** A liveness/readiness endpoint before anything is containerized.
 - **Depends on:** P0-2
 - **Scope:** Add `spring-boot-starter-actuator`; expose `/actuator/health` only; decide what
@@ -121,7 +120,7 @@ Established by direct inspection, not assumption:
 - **Docs:** Endpoint + exposure decision in the Phase 0 note.
 - **Interview concepts:** Liveness vs readiness; why exposing all actuator endpoints is a
   vulnerability; health checks as a deployment contract.
-- **Status:** ☐ Not started.
+- **Status:** ✅ Completed 2026-08-26 — 6 tests, all passing.
 
 #### ☐ P0-8 · Initialize the Next.js frontend — *web*
 - **Goal:** Turn the `apps/web` scaffold into a real, buildable Next.js app.
@@ -169,6 +168,52 @@ Two findings worth carrying forward:
    uncommitted work.
 2. `spring.profiles.default=dev` means a deployment that forgets `SPRING_PROFILES_ACTIVE` silently
    runs with `ddl-auto=update` against its real database. Tracked as P12-1.
+
+**P0-6 (2026-08-26)** — Committed the developer's pending `auth` → `users` extraction as `65e73fd`
+after re-running the tests on the exact tree being committed (`BUILD SUCCESS`, 4 tests, 0 failures)
+and scanning the staged diff for secrets (only the `.env.example` placeholder and `${DB_PASSWORD:}`
+indirection — no literals). Git recorded both file moves as **renames** (R052/R057), so history
+follows `User.java` and `UserRepository.java` into `users/`.
+
+`origin/main` had meanwhile gained `cbaea97 Update README.md`, so `main` was 1 ahead / 1 behind.
+Resolved with `git pull --rebase` — zero path overlap, no conflicts — then a normal fast-forward
+push. No force push, no reset, nothing stashed or discarded. The two local commits took new hashes
+(`26e7ef3`→`992ed3e`, `fa09d95`→`65e73fd`), which is expected for a rebase and harmless since
+neither had been pushed.
+
+**P0-7 (2026-08-26)** — Added `spring-boot-starter-actuator` and exposed **only** `/actuator/health`.
+
+Decisions made:
+- **`management.endpoints.web.exposure.include=health`** — nothing else reaches the web surface.
+  `env`, `beans`, `configprops`, and `heapdump` leak configuration and internals; each one gets
+  exposed only when a task needs it.
+- **Health is public** (`permitAll` in `SecurityConfig`). Probes run before any credential exists —
+  container health checks, load balancers, and Kubernetes liveness/readiness cannot authenticate.
+  Leaving it behind `anyRequest().authenticated()` would have made it useless for P12-2/P13-1.
+- **`show-details=never`** — the public response is UP/DOWN and nothing more, so making it public
+  costs no information. `when-authorized` would be better once a role model exists, but
+  `CLAUDE.md` §11 forbids inventing one before a task defines it. Revisit then.
+- **`probes.enabled=true`** — `/actuator/health/liveness` and `/actuator/health/readiness` now exist,
+  which is what P13-1 will wire to Kubernetes probes. Enabled now because P0-7's stated goal is a
+  liveness/readiness endpoint, not simply "a health URL".
+
+Tests: `HealthEndpointTest` — 6 tests, all passing. Health reachable anonymously and reports UP;
+no `components` key in the body; both probes reachable anonymously; `/actuator/env` and
+`/actuator/beans` return 401 anonymously **and 404 even when authenticated** (`@WithMockUser`) —
+the second assertion is the one that actually proves non-exposure rather than merely proving the
+security rule. Full suite: `Tests run: 10, Failures: 0, Errors: 0, Skipped: 0`, `BUILD SUCCESS`.
+
+Two notes for later:
+- The test excludes datasource auto-configuration, so there is no `db` health indicator in it.
+  Against a real database, health correctly reports **DOWN with 503** when PostgreSQL is
+  unreachable — that is the point of the check, and P12-2's container healthcheck will depend on it.
+- `SecurityConfig` lives in `auth/security/` but now governs an operational path. It is the single
+  filter chain for the whole application, so it arguably belongs in `common/config/`. Not moved —
+  out of scope for this task, and worth doing deliberately rather than as a drive-by.
+
+Verified against Spring Boot 4's repackaged test annotations before writing the test:
+`@AutoConfigureMockMvc` is `org.springframework.boot.webmvc.test.autoconfigure` in Boot 4, not the
+Boot 3 `org.springframework.boot.test.autoconfigure.web.servlet`.
 
 ---
 

@@ -19,6 +19,11 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll()
+                        // Probes run before a credential exists (container health
+                        // checks, load balancers, Kubernetes liveness/readiness), so
+                        // health must be reachable unauthenticated. Only health is
+                        // exposed at all - see management.* in application.properties.
+                        .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         .anyRequest().authenticated()
                 )
 
