@@ -2,40 +2,29 @@ package com.example.chat_app.auth.service;
 
 import com.example.chat_app.auth.dto.RegisterRequest;
 import com.example.chat_app.auth.dto.RegisterResponse;
-import com.example.chat_app.auth.entity.User;
-import com.example.chat_app.auth.repository.UserRepository;
-import com.example.chat_app.common.exception.EmailAlreadyExistsException;
-import com.example.chat_app.common.exception.UsernameAlreadyExistsException;
+import com.example.chat_app.users.entity.User;
+import com.example.chat_app.users.service.UserRegistrationService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service //Create one object of this class and manage it.
 public class AuthService {
 
-    private final UserRepository userRepository; //Constructor Injection:This service depends on UserRepository.
+    private final UserRegistrationService userRegistrationService;
     private final PasswordEncoder passwordEncoder;
 
-    public AuthService(UserRepository userRepository,PasswordEncoder passwordEncoder) {//Spring says:"I already have a UserRepository object."
-        this.userRepository = userRepository;
+    public AuthService(UserRegistrationService userRegistrationService, PasswordEncoder passwordEncoder) {
+        this.userRegistrationService = userRegistrationService;
         this.passwordEncoder = passwordEncoder;
-        System.out.println("AuthService Created Successfully!");
-
     }
-    //it return registerRsponse
+
     public RegisterResponse register(RegisterRequest request) {
-       // Check if Username Already Exists
-        if (userRepository.existsByUsername(request.getUsername())) {
-            throw new UsernameAlreadyExistsException();
-        }
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new EmailAlreadyExistsException();
-        }
-        User user = User.builder()
-                .username(request.getUsername())
-                .email(request.getEmail())
-                .password(passwordEncoder.encode(request.getPassword()))
-                .build();
-        User savedUser = userRepository.save(user);
+        String passwordHash = passwordEncoder.encode(request.getPassword());
+        User savedUser = userRegistrationService.register(
+                request.getUsername(),
+                request.getEmail(),
+                passwordHash
+        );
 
         return RegisterResponse.builder()
                 .id(savedUser.getId())

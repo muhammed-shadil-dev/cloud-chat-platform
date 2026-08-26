@@ -1,6 +1,6 @@
 package com.example.chat_app.auth.security;
 
-import com.example.chat_app.auth.entity.User;
+import com.example.chat_app.users.entity.User;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
