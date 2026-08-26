@@ -381,13 +381,32 @@ One folder per backend module: `auth/`, `users/`, `chat/`, `rooms/`, `presence/`
 `media/`, `search/`. **Create a module folder only when that module's first feature is implemented.**
 
 - Every completed feature gets a note built from the template at
-  `docs/templates/obsidian-feature-note.md` (mirrored in the vault at
-  `...\cloud-based-chat-app\templates\Feature-Template.md`). Use all 17 sections; write
+  `docs/templates/obsidian-feature-note.md` — **the canonical copy**. Use all 17 sections; write
   "Not applicable — {reason}" instead of deleting a section.
+  The vault keeps a working copy at `...\cloud-based-chat-app\templates\Feature-Template.md`. The
+  two are kept in step but are **not identical**: the vault copy also carries a
+  `# 18. References` section and writes its §7 heading as `# 7 Security & Access Control` (no
+  period). Neither copy is 19 sections — that number comes from the Reliable Job Queue project's
+  template, not this one. Follow the repo copy when they disagree.
 - Notes describe the **actual implementation**, not the generic template flow. If the feature's
   request flow differs from the template diagram, draw the real one.
-- Only §10 (Testing) reports real, executed results. Never invent a benchmark or claim a test passed
-  without running it.
+- **§10 is "Testing & Verification" and has two halves with different owners.**
+  - **§10.1 Automated Tests** — Claude runs these and reports real, executed results. Never invent
+    a benchmark or claim a test passed without running it.
+  - **§10.2–§10.11 Manual Verification** (Postman, negative cases, PostgreSQL, Redis,
+    WebSocket/STOMP, auth, file storage, Actuator, logs, checklist) — **Claude writes the guide;
+    the developer performs the verification.** Claude must never claim a manual check was
+    performed, never fill in an "Actual Result", and never set `✅ Fully Verified`. Those fields
+    stay `[To be filled after manual verification]` and the status stays
+    `⏳ Implementation Complete — Manual Verification Pending` until the developer reports back.
+    Passing automated tests are not grounds for changing it.
+  - **§10.12** explains what each verification layer proves and which bugs it is blind to.
+- **Before writing a manual verification guide, inspect the real implementation** — controllers,
+  services, repositories, entities, DTOs, security config, the schema the entities generate, Redis
+  and WebSocket configuration, storage, Actuator config, and `application*.properties`. **Never
+  invent** an endpoint, HTTP method, port, table, column, Redis key, STOMP destination, request or
+  response field, auth flow, or log message. If a check cannot run here, write exactly:
+  `Manual verification required — environment unavailable.`
 - §17 (Interview Questions) must be grounded in this feature's actual code — no generic "what is
   Spring Boot" filler. Include concise answers.
 - **Phase 0 exception:** foundation tasks are not features and do not fit the 17-section template.
@@ -408,12 +427,16 @@ A task is done only when **all** of these are true:
 1. Implementation matches the task's stated scope — no more, no less.
 2. Validation and error handling exist for the paths a real client can hit.
 3. Tests are written **and were actually executed and passed** (real output reported).
-4. No secrets, credentials, or `.env` files are staged.
-5. `task.md` is updated: box checked, implementation notes added (what was built, tests run,
+4. A **manual verification guide** (§10.2–§10.11) exists for every subsection the feature actually
+   reaches, built from the real implementation, with results left blank and the status set to
+   `⏳ Implementation Complete — Manual Verification Pending`. The guide being *written* is the
+   requirement; the guide being *run* is the developer's step, not a blocker on the task.
+5. No secrets, credentials, or `.env` files are staged.
+6. `task.md` is updated: box checked, implementation notes added (what was built, tests run,
    engineering decisions made).
-6. The Obsidian note is created or updated per §16.
-7. Learning material and interview questions are produced (§18 report format).
-8. Work is committed with a conventional-commit message, and pushed if the remote is reachable.
+7. The Obsidian note is created or updated per §16.
+8. Learning material and interview questions are produced (§18 report format).
+9. Work is committed with a conventional-commit message, and pushed if the remote is reachable.
 
 If any of these cannot be satisfied, the task stays open and the blocker is reported.
 
@@ -480,6 +503,10 @@ concurrency, distributed systems, reliability, Docker, and system design.
 
 ## Tests
 - <command run> — <real result>
+
+## Manual Verification
+- Guide written for §<subsections that apply> — ⏳ Implementation Complete — Manual Verification Pending
+- Run it from: `<exact note path>`
 
 ## Architectural Decisions
 - <decision and why>
