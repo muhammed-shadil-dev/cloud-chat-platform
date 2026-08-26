@@ -12,7 +12,29 @@ Rules for this file:
 - Work top-to-bottom within a phase. Do not skip ahead across phases.
 - Before implementing, verify against the repository — a task may already be done.
 
-**Status legend:** ✅ Done · 🚧 In progress · ☐ Not started · ⛔ Blocked
+**Status legend:** ✅ Done · 🚧 In progress · ☐ Not started · ⏸ Deferred · ⛔ Blocked
+
+**⏸ Deferred** means still in the roadmap and still intended — consciously postponed, not dropped
+and not done. A deferred task is skipped by `/next` until the developer reactivates it.
+
+## Active priority (set 2026-08-26)
+
+The developer's priority is **Backend SDE placement and backend engineering depth**. The active
+line of work is therefore the backend authentication sequence, not the remaining frontend
+scaffolding:
+
+```
+P1-5  Registration WebMvcTest coverage      ← next
+  ↓
+P1-6  Database-backed authentication
+  ↓
+P1-7  Login endpoint and JWT issuance
+```
+
+This is a **deliberate deviation** from strict top-to-bottom phase order: **P0-8** (Next.js
+frontend initialization) is deferred, and P0-9 was already dependency-blocked on P1-7. Phase 0 is
+otherwise complete, so `/next` should proceed into Phase 1 rather than treating Phase 0 as a
+barrier. Recorded here so the board does not silently drift from the order it documents.
 
 ---
 
@@ -28,8 +50,9 @@ Established by direct inspection, not assumption:
   them. There is no login endpoint, no JWT, and no `UserDetailsService` bean — the boot log shows
   Spring Security still falling back to `inMemoryUserDetailsManager`, so **no database user can
   currently authenticate**. `CustomUserDetails` is written but unused.
-- **`apps/web` is not initialized.** `package.json`, `next.config.ts`, and `tsconfig.json` are
-  0-byte files; the feature directories are empty; there is no `node_modules`.
+- **`apps/web` is not initialized** and is now **⏸ deferred** (P0-8). `package.json`,
+  `next.config.ts`, and `tsconfig.json` are 0-byte files; the feature directories are empty; there
+  is no `node_modules`.
 - **`docker/`, `deployment/`, `monitoring/`, `scripts/` are empty.** No Docker CLI on this machine.
 - ~~**Uncommitted work is in the tree.**~~ Resolved 2026-08-26: the `auth` → `users` module
   extraction, its tests, `.env.example`, `application-dev.properties`, and the two `AGENTS.md`
@@ -122,7 +145,7 @@ Established by direct inspection, not assumption:
   vulnerability; health checks as a deployment contract.
 - **Status:** ✅ Completed 2026-08-26 — 6 tests, all passing.
 
-#### ☐ P0-8 · Initialize the Next.js frontend — *web*
+#### ⏸ P0-8 · Initialize the Next.js frontend — *web*
 - **Goal:** Turn the `apps/web` scaffold into a real, buildable Next.js app.
 - **Depends on:** P0-1
 - **Scope:** Real `package.json`, `next.config.ts`, `tsconfig.json` (strict), Tailwind, shadcn/ui
@@ -132,7 +155,12 @@ Established by direct inspection, not assumption:
 - **Docs:** A short "how to run the frontend" section in `README.md`.
 - **Interview concepts:** App Router vs Pages Router; server vs client components; why the frontend
   is a separate deployable.
-- **Status:** ☐ Not started — no `node_modules`; requires `npm install`.
+- **Status:** ⏸ **Deferred 2026-08-26** — not started, not dropped. Postponed by the developer to
+  prioritize backend depth for SDE placement; the frontend is not on the critical path for the
+  auth, chat, WebSocket, or Redis work that carries the portfolio. Stays in the roadmap.
+  **Reactivate when:** the backend has endpoints worth driving from a UI (realistically after
+  P1-7 login and P3-2 rooms), or a demo needs a visible client. Still requires `npm install`.
+  Nothing else depends on this task except P12-3 (frontend container / Nginx).
 
 #### ☐ P0-9 · OpenAPI / Swagger UI — *api*
 - **Goal:** Generated, browsable API documentation that cannot drift from the code.
@@ -215,6 +243,16 @@ Verified against Spring Boot 4's repackaged test annotations before writing the 
 `@AutoConfigureMockMvc` is `org.springframework.boot.webmvc.test.autoconfigure` in Boot 4, not the
 Boot 3 `org.springframework.boot.test.autoconfigure.web.servlet`.
 
+**P0-8 (2026-08-26) — deferred, not dropped.** The developer's priority is Backend SDE placement, so
+the Next.js initialization is postponed and the active line moves to the Phase 1 authentication
+sequence (P1-5 → P1-6 → P1-7). Rationale: the frontend is not on the critical path for the auth,
+chat, WebSocket, and Redis work that carries this portfolio, and an uninitialized `apps/web` costs
+nothing until there is an API worth driving from a UI. Consequences recorded rather than left
+implicit: **P12-3** (frontend container + Nginx) is transitively blocked while this stands, and
+`apps/web` remains 0-byte placeholder files, so any claim about the frontend building is false until
+P0-8 is reactivated. With P0-8 deferred and P0-9 dependency-blocked on P1-7, **Phase 0 is otherwise
+complete** and `/next` proceeds into Phase 1.
+
 ---
 
 ## PHASE 1 — Authentication  *(module: `auth`, `users`)*
@@ -278,7 +316,8 @@ Boot 3 `org.springframework.boot.test.autoconfigure.web.servlet`.
 - **Docs:** Update the registration note's §10 Testing with real results.
 - **Interview concepts:** Slice tests vs full context tests; why `@WebMvcTest` needs security
   configuration considered; testing validation at the boundary that enforces it.
-- **Status:** ☐ Not started. **Small task — closes the registration feature.**
+- **Status:** ☐ Not started. **← ACTIVE — next task for `/next`.** Small; closes out registration
+  before the auth sequence continues.
 
 #### ☐ P1-6 · Database-backed authentication — *auth*
 - **Goal:** Make persisted users actually able to authenticate. Today `CustomUserDetails` exists but
@@ -297,7 +336,7 @@ Boot 3 `org.springframework.boot.test.autoconfigure.web.servlet`.
   `UserDetailsService` → `PasswordEncoder` chain; why `UserDetailsService` returns a user and never
   compares passwords itself; timing attacks and generic failure messages; `SecurityContextHolder`
   and how the principal reaches a controller.
-- **Status:** ☐ Not started. **← Next real feature.**
+- **Status:** ☐ Not started. **← Next real feature, immediately after P1-5.**
 
 #### ☐ P1-7 · Login endpoint and JWT issuance — *auth*
 - **Goal:** `POST /api/auth/login` returns a signed JWT for valid credentials.
@@ -689,8 +728,10 @@ passes · **Concepts:** layer caching, build vs runtime images, why secrets neve
 
 #### ☐ P12-3 · Frontend container and Nginx
 Production Next.js image; Nginx reverse proxy with WebSocket upgrade handling and TLS termination.
-**Depends on:** P0-8, P12-2 · **Concepts:** proxying WebSocket upgrades, TLS termination, static
-asset caching. · **Status:** ☐
+**Depends on:** P0-8 (⏸ deferred), P12-2 · **Concepts:** proxying WebSocket upgrades, TLS
+termination, static asset caching. · **Status:** ☐ — transitively blocked while P0-8 is deferred.
+The Nginx/WebSocket-upgrade half could be split out and done against the API alone if the frontend
+is still deferred by the time Phase 12 is reached.
 
 ---
 
