@@ -26,10 +26,19 @@ scaffolding:
 ```
 P1-5  Registration WebMvcTest coverage      ✅ done 2026-08-26
   ↓
-P1-6  Database-backed authentication        ← next
+P1-6  Database-backed authentication        ✅ done 2026-09-03
   ↓
-P1-7  Login endpoint and JWT issuance       (needs 3 decisions first — see task)
+P1-7  Login endpoint and JWT issuance       ← next — BLOCKED pending 3 decisions
 ```
+
+**P1-7 needs three decisions from the developer before any code is written** (`CLAUDE.md` §11
+requires them to be explicit, never defaults chosen by accident):
+
+1. **Signing algorithm** — HMAC (HS256, shared secret) or RSA (RS256, key pair)?
+2. **Token lifetime** — how long is an access token valid?
+3. **Claims** — what goes in the payload beyond subject and expiry?
+
+`/next` must stop and ask rather than choose silently.
 
 This is a **deliberate deviation** from strict top-to-bottom phase order: **P0-8** (Next.js
 frontend initialization) is deferred, and P0-9 was already dependency-blocked on P1-7. Phase 0 is
@@ -319,7 +328,7 @@ complete** and `/next` proceeds into Phase 1.
 - **Status:** ✅ Completed 2026-08-26 — 10 tests, all passing. Registration's HTTP contract is now
   covered; the feature is closed out.
 
-#### ☐ P1-6 · Database-backed authentication — *auth*
+#### ✅ P1-6 · Database-backed authentication — *auth*
 - **Goal:** Make persisted users actually able to authenticate. Today `CustomUserDetails` exists but
   no `UserDetailsService` bean does, so Spring Security falls back to an in-memory user and every
   registered account is unusable.
@@ -336,7 +345,8 @@ complete** and `/next` proceeds into Phase 1.
   `UserDetailsService` → `PasswordEncoder` chain; why `UserDetailsService` returns a user and never
   compares passwords itself; timing attacks and generic failure messages; `SecurityContextHolder`
   and how the principal reaches a controller.
-- **Status:** ☐ Not started. **← Next real feature, immediately after P1-5.**
+- **Status:** ✅ Completed 2026-09-03 — 15 tests (4 + 4 unit, 7 integration), all passing. Registered
+  users can now authenticate; the `inMemoryUserDetailsManager` fallback is gone.
 
 #### ☐ P1-7 · Login endpoint and JWT issuance — *auth*
 - **Goal:** `POST /api/auth/login` returns a signed JWT for valid credentials.
@@ -418,6 +428,54 @@ Two findings recorded, not fixed (out of P1-5's scope):
 Also confirmed while writing the verification guide: **no class in `auth`, `users`, or `common`
 declares a logger**, so this feature emits no application log lines of its own. The note says so
 rather than inventing log output.
+
+**P1-6 (2026-09-03)** — Registered users can finally authenticate. Two new production classes, one
+new bean, 15 new tests. Full suite `Tests run: 35, Failures: 0, Errors: 0, Skipped: 0` —
+`BUILD SUCCESS`.
+
+Built:
+- `users/service/UserLookupService` — `findByUsernameOrEmail`, `@Transactional(readOnly = true)`,
+  username tried first with an `Optional.or(...)` fallback to email.
+- `auth/security/DatabaseUserDetailsService` — implements `UserDetailsService`, maps the found user
+  to the already-existing `CustomUserDetails`, throws `UsernameNotFoundException` otherwise.
+- `SecurityConfig.authenticationManager(...)` — a `ProviderManager` wrapping a
+  `DaoAuthenticationProvider` built from the `UserDetailsService` and the existing BCrypt encoder.
+
+Decisions:
+- **The lookup lives in `users`, not `auth`.** `auth` needed to read a user, and `CLAUDE.md` §5
+  forbids reaching into another module's repository. Rather than injecting `UserRepository` into
+  `DatabaseUserDetailsService`, a read-side service was added to `users` so the dependency stays on
+  behavior. Returning the `User` entity across the boundary matches the precedent already set by
+  `UserRegistrationService.register(...)`.
+- **Username first, then email.** Both columns are uniquely constrained so at most one row can match
+  either; username is tried first as the more common login identifier. A test asserts the email
+  query does *not* run when the username already matched.
+- **`hideUserNotFoundExceptions` left at its default (`true`).** An unknown username surfaces as
+  `BadCredentialsException`, identical to a wrong password, so the endpoint cannot be used to
+  enumerate accounts. The `UsernameNotFoundException` message is generic (`"Invalid credentials"`)
+  for the same reason.
+- **`enabled = false` rejected by the provider, not by the loader.** `DatabaseUserDetailsService`
+  loads a disabled user and reports `isEnabled() == false`; `DaoAuthenticationProvider`'s
+  pre-authentication checks turn that into a `DisabledException`. Keeping the loader free of policy
+  is what lets the check be configured centrally later.
+- **`AuthenticationManager` declared explicitly** rather than left implicit, because P1-7 must inject
+  one to authenticate login credentials itself.
+
+Honest note on the wiring: Spring Security *also* auto-configures a global `AuthenticationManager`
+from the `UserDetailsService` + `PasswordEncoder` beans — the startup log shows
+`Global AuthenticationManager configured with UserDetailsService bean with name
+databaseUserDetailsService`. Both paths resolve to the same collaborators, so behavior is identical;
+the explicit bean exists so P1-7 has something well-defined to inject. Not claiming the filter chain
+demonstrably uses the explicit bean rather than the global one — the tests prove the behavior, not
+which of the two objects served it.
+
+Test change required elsewhere: `AuthControllerTest` imports `SecurityConfig`, which now needs a
+`UserDetailsService` and a `PasswordEncoder`. `@WebMvcTest` scans neither, so the slice gained
+`@Import(PasswordConfig.class)` and a `@MockitoBean UserDetailsService`. This is the slice test doing
+its job — it broke the moment the imported configuration grew a new dependency.
+
+Evidence the fallback is gone: the startup line `Using generated security password: ...` no longer
+appears anywhere in the test output. Before this task it did.
 
 ---
 

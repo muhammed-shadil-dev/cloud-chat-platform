@@ -4,8 +4,10 @@ import com.example.chat_app.auth.dto.RegisterRequest;
 import com.example.chat_app.auth.dto.RegisterResponse;
 import com.example.chat_app.auth.security.SecurityConfig;
 import com.example.chat_app.auth.service.AuthService;
+import com.example.chat_app.common.config.PasswordConfig;
 import com.example.chat_app.common.exception.EmailAlreadyExistsException;
 import com.example.chat_app.common.exception.UsernameAlreadyExistsException;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,7 +39,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * {@code /api/auth/**} is public.
  */
 @WebMvcTest(AuthController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, PasswordConfig.class})
 class AuthControllerTest {
 
     private static final String VALID_BODY = """
@@ -50,6 +52,14 @@ class AuthControllerTest {
 
     @MockitoBean
     private AuthService authService;
+
+    /**
+     * Required by the imported {@link SecurityConfig}'s {@code AuthenticationManager} bean. The
+     * real one loads users from the database, which this slice has no repository for - and these
+     * tests only exercise the public registration path, which never authenticates anyone.
+     */
+    @MockitoBean
+    private UserDetailsService userDetailsService;
 
     @Autowired
     private MockMvc mockMvc;
